@@ -12,7 +12,9 @@ import JSON5 from "json5";
 import { DOMParser } from "@b-fuze/deno-dom";
 import * as fileServer from "@std/http/file-server";
 
-const projectPath = new URL(".", import.meta.url).pathname;
+// We use fromFileUrl rather than the URL's pathname, because on Windows the
+// pathname has a leading slash (like "/C:/vimium/"), which path.join then mangles.
+const projectPath = path.fromFileUrl(new URL(".", import.meta.url));
 
 async function shell(procName, argsArray = []) {
   // NOTE(philc): Does drake's `sh` function work on Windows? If so, that can replace this function.
@@ -265,7 +267,7 @@ async function runUnitTests() {
   const files = Array.from(Deno.readDirSync(dir)).map((f) => f.name).sort();
   for (const f of files) {
     if (f.endsWith("_test.js")) {
-      await import(path.join(dir, f));
+      await import(path.toFileUrl(path.join(dir, f)).href);
     }
   }
 
