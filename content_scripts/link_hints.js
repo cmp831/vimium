@@ -184,7 +184,7 @@ const HintCoordinator = {
     chrome.runtime.sendMessage(request);
   },
 
-  prepareToActivateMode(mode, onExit) {
+  prepareToActivateMode(mode, hintCursorPointer, onExit) {
     // We need to communicate with the background page (and other frames) to initiate link-hints
     // mode. To prevent other Vimium commands from being triggered before link-hints mode is
     // launched, we install a temporary mode to block (and cache) keyboard events.
@@ -211,6 +211,7 @@ const HintCoordinator = {
     chrome.runtime.sendMessage({
       handler: "prepareToActivateLinkHintsMode",
       modeIndex: availableModes.indexOf(mode),
+      hintCursorPointer,
       isExtensionPage,
       requestedByHelpDialog: globalThis.isVimiumHelpDialog,
     });
@@ -219,7 +220,7 @@ const HintCoordinator = {
   // Returns a list of HintDescriptors. Hint descriptors are global. They include all of the
   // information necessary for each frame to determine whether and when a hint from *any* frame is
   // selected.
-  getHintDescriptors({ modeIndex, requestedByHelpDialog }, _sender) {
+  getHintDescriptors({ modeIndex, requestedByHelpDialog, hintCursorPointer }, _sender) {
     if (!DomUtils.isReady() || DomUtils.windowIsTooSmall()) return [];
 
     const requireHref = [COPY_LINK_URL, OPEN_INCOGNITO].includes(availableModes[modeIndex]);
@@ -229,7 +230,7 @@ const HintCoordinator = {
     if (requestedByHelpDialog && !globalThis.isVimiumHelpDialog) {
       this.localHints = [];
     } else {
-      this.localHints = LocalHints.getLocalHints(requireHref);
+      this.localHints = LocalHints.getLocalHints(requireHref, hintCursorPointer);
     }
     this.localHintDescriptors = this.localHints.map(({ linkText }, localIndex) => (
       new HintDescriptor({
@@ -309,9 +310,16 @@ const HintCoordinator = {
 };
 
 const LinkHints = {
-  activateMode(count, { mode, registryEntry }) {
+  activateMode(count, { mode, registryEntry, hintCursorPointer }) {
     if (count == null) count = 1;
     if (mode == null) mode = OPEN_IN_CURRENT_TAB;
+
+    // The "cursorPointer" option is a flag, so it's true when present. We also accept an explicit
+    // value, so that "cursorPointer=false" behaves as the user expects.
+    if (hintCursorPointer == null) {
+      const option = registryEntry?.options.cursorPointer;
+      hintCursorPointer = (option === true) || (option === "true");
+    }
 
     switch (registryEntry?.options.action) {
       case "copy-text":
@@ -326,33 +334,33 @@ const LinkHints = {
     }
 
     if ((count > 0) || (mode === OPEN_WITH_QUEUE)) {
-      HintCoordinator.prepareToActivateMode(mode, function (isSuccess) {
+      HintCoordinator.prepareToActivateMode(mode, hintCursorPointer, function (isSuccess) {
         if (isSuccess) {
           // Wait for the next tick to allow the previous mode to exit. It might yet generate a
           // click event, which would cause our new mode to exit immediately.
-          Utils.nextTick(() => LinkHints.activateMode(count - 1, { mode }));
+          Utils.nextTick(() => LinkHints.activateMode(count - 1, { mode, hintCursorPointer }));
         }
       });
     }
   },
 
-  activateModeToOpenInNewTab(count) {
-    this.activateMode(count, { mode: OPEN_IN_NEW_BG_TAB });
+  activateModeToOpenInNewTab(count, { registryEntry } = {}) {
+    this.activateMode(count, { mode: OPEN_IN_NEW_BG_TAB, registryEntry });
   },
-  activateModeToOpenInNewForegroundTab(count) {
-    this.activateMode(count, { mode: OPEN_IN_NEW_FG_TAB });
+  activateModeToOpenInNewForegroundTab(count, { registryEntry } = {}) {
+    this.activateMode(count, { mode: OPEN_IN_NEW_FG_TAB, registryEntry });
   },
-  activateModeToCopyLinkUrl(count) {
-    this.activateMode(count, { mode: COPY_LINK_URL });
+  activateModeToCopyLinkUrl(count, { registryEntry } = {}) {
+    this.activateMode(count, { mode: COPY_LINK_URL, registryEntry });
   },
-  activateModeWithQueue() {
-    this.activateMode(1, { mode: OPEN_WITH_QUEUE });
+  activateModeWithQueue(_count, { registryEntry } = {}) {
+    this.activateMode(1, { mode: OPEN_WITH_QUEUE, registryEntry });
   },
-  activateModeToOpenIncognito(count) {
-    this.activateMode(count, { mode: OPEN_INCOGNITO });
+  activateModeToOpenIncognito(count, { registryEntry } = {}) {
+    this.activateMode(count, { mode: OPEN_INCOGNITO, registryEntry });
   },
-  activateModeToDownloadLink(count) {
-    this.activateMode(count, { mode: DOWNLOAD_LINK_URL });
+  activateModeToDownloadLink(count, { registryEntry } = {}) {
+    this.activateMode(count, { mode: DOWNLOAD_LINK_URL, registryEntry });
   },
 };
 
@@ -1125,7 +1133,9 @@ const LocalHints = {
   // which bounds this element in the viewport. We return an array because there may be more than
   // one part of element which is clickable (for example, if it's an image); if so, each LocalHint
   // represents one of the clickable rectangles of the element.
-  getLocalHintsForElement(element) {
+  // - hintCursorPointer: true if elements styled with "cursor: pointer" should be treated as
+  //   clickable.
+  getLocalHintsForElement(element, hintCursorPointer) {
     // Get the tag name. However, `element.tagName` can be an element (not a string, see #2035), so
     // we guard against that.
     const tagName = element.tagName.toLowerCase?.() || "";
@@ -1254,7 +1264,7 @@ const LocalHints = {
       case "label":
         isClickable ||= (element.control != null) &&
           !element.control.disabled &&
-          ((this.getLocalHintsForElement(element.control)).length === 0);
+          ((this.getLocalHintsForElement(element.control, hintCursorPointer)).length === 0);
         break;
       case "body":
         isClickable ||= (element === document.body) && !windowIsFocused() &&
@@ -1295,6 +1305,19 @@ const LocalHints = {
     if (!isClickable) {
       const className = element.getAttribute("class")?.toLowerCase();
       if (className?.includes("button") || className?.includes("btn")) {
+        isClickable = true;
+        possibleFalsePositive = true;
+      }
+    }
+
+    // An element styled with "cursor: pointer" is often a click handler in sites which don't use
+    // native clickable elements. Because the CSS cursor property is inherited, every descendant of
+    // such an element also computes to "pointer", so we only hint the outermost element of each
+    // pointer subtree. These are marked as unreliable, because real clickables are often wrapped in
+    // elements which are also styled with "cursor: pointer".
+    if (!isClickable && hintCursorPointer && element.parentElement) {
+      const isPointer = (el) => getComputedStyle(el).cursor === "pointer";
+      if (isPointer(element) && !isPointer(element.parentElement)) {
         isClickable = true;
         possibleFalsePositive = true;
       }
@@ -1379,7 +1402,8 @@ const LocalHints = {
   // rects for the whole element.
   // - requireHref: true if the hintable element must have an href, because an href is required for
   //   commands like "LinkHints.activateModeToCopyLinkUrl".
-  getLocalHints(requireHref) {
+  // - hintCursorPointer: true if elements styled with "cursor: pointer" should be hinted.
+  getLocalHints(requireHref, hintCursorPointer) {
     // We need documentElement to be ready in order to find links.
     if (!document.documentElement) return [];
 
@@ -1406,7 +1430,7 @@ const LocalHints = {
     // below.
     for (const element of Array.from(elements)) {
       if (!requireHref || !!element.href) {
-        const hints = this.getLocalHintsForElement(element);
+        const hints = this.getLocalHintsForElement(element, hintCursorPointer);
         localHints.push(...hints);
       }
     }

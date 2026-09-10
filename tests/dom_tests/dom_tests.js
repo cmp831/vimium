@@ -40,8 +40,8 @@ HintCoordinator.sendMessage = (name, request) => {
   return request;
 };
 
-const activateLinkHintsMode = () => {
-  HintCoordinator.getHintDescriptors({ modeIndex: 0 }, {}, () => {});
+const activateLinkHintsMode = (options = {}) => {
+  HintCoordinator.getHintDescriptors(Object.assign({ modeIndex: 0 }, options), {}, () => {});
   HintCoordinator.activateMode({
     frameIdToHintDescriptors: {},
     modeIndex: 0,
@@ -117,6 +117,34 @@ context("False positives in link-hint", () => {
     const mode = activateLinkHintsMode();
     mode.deactivateMode();
     assert.equal(["clickable", "clickable"], mode.hintMarkers.map((m) => m.linkText));
+  });
+});
+
+context("Link hints for elements styled with cursor: pointer", () => {
+  setup(() => {
+    const testContent = '<div id="pointer" style="cursor: pointer"><span>pointer</span></div>' +
+      '<div style="cursor: pointer"><a>link</a></div>';
+    document.getElementById("test-div").innerHTML = testContent;
+    stubSettings("filterLinkHints", true);
+    stubSettings("linkHintNumbers", "12");
+    stub(globalThis, "windowIsFocused", () => true);
+  });
+
+  teardown(() => document.getElementById("test-div").innerHTML = "");
+
+  should("not show hints for cursor: pointer elements unless requested", () => {
+    const mode = activateLinkHintsMode();
+    mode.deactivateMode();
+    assert.equal(["link"], mode.hintMarkers.map((m) => m.linkText).sort());
+  });
+
+  should("show one hint for the outermost element of each cursor: pointer subtree", () => {
+    const mode = activateLinkHintsMode({ hintCursorPointer: true });
+    mode.deactivateMode();
+    // The div wrapping the link is a false positive, so only the link within it is hinted.
+    assert.equal(["link", "pointer"], mode.hintMarkers.map((m) => m.linkText).sort());
+    const hint = mode.hintMarkers.find((m) => m.linkText == "pointer");
+    assert.equal(document.getElementById("pointer"), hint.localHint.element);
   });
 });
 

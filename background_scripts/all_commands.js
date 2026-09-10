@@ -11,6 +11,13 @@
 //   confirmation.
 // - topFrame: whether this command must be run only in the top frame of a page.
 //
+
+// The description of the "cursorPointer" option, which every LinkHints command supports.
+const cursorPointerOption = "Optional. Also show hints for elements which are styled with " +
+  "`cursor: pointer`. This finds clickable elements on sites which don't use links or " +
+  "buttons, at the cost of showing some hints which aren't clickable, and of making hint " +
+  "collection slower on large pages.";
+
 const allCommands = [
   //
   // Navigation
@@ -191,6 +198,7 @@ const allCommands = [
     options: {
       action: "one of `hover`, `focus`, `copy-text`. When a link is selected, " +
         "instead of clicking on the link, perform the specified action.",
+      cursorPointer: cursorPointerOption,
     },
     group: "navigation",
     advanced: true,
@@ -199,18 +207,27 @@ const allCommands = [
   {
     name: "LinkHints.activateModeToOpenInNewTab",
     desc: "Open a link in a new tab",
+    options: {
+      cursorPointer: cursorPointerOption,
+    },
     group: "navigation",
   },
 
   {
     name: "LinkHints.activateModeToOpenInNewForegroundTab",
     desc: "Open a link in a new tab & switch to it",
+    options: {
+      cursorPointer: cursorPointerOption,
+    },
     group: "navigation",
   },
 
   {
     name: "LinkHints.activateModeWithQueue",
     desc: "Open multiple links in a new tab",
+    options: {
+      cursorPointer: cursorPointerOption,
+    },
     group: "navigation",
     advanced: true,
     noRepeat: true,
@@ -219,6 +236,9 @@ const allCommands = [
   {
     name: "LinkHints.activateModeToDownloadLink",
     desc: "Download link url",
+    options: {
+      cursorPointer: cursorPointerOption,
+    },
     group: "navigation",
     advanced: true,
   },
@@ -226,6 +246,9 @@ const allCommands = [
   {
     name: "LinkHints.activateModeToOpenIncognito",
     desc: "Open a link in incognito window",
+    options: {
+      cursorPointer: cursorPointerOption,
+    },
     group: "navigation",
     advanced: true,
   },
@@ -233,6 +256,9 @@ const allCommands = [
   {
     name: "LinkHints.activateModeToCopyLinkUrl",
     desc: "Copy a link URL to the clipboard",
+    options: {
+      cursorPointer: cursorPointerOption,
+    },
     group: "navigation",
     advanced: true,
   },
