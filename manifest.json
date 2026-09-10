@@ -1,5 +1,9 @@
 {
   "manifest_version": 3,
+  // Pinning a key here gives this unpacked extension the same ID on every machine it's loaded
+  // on, so that all of them share one set of settings synced through the browser. Remove it if
+  // this extension is ever published to the Chrome Web Store, which assigns its own key.
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7KnxFRYieYsFs49kswdgQMY+XtB8nO7hSNqy30rpgAfZvsMwjeG5aQ7L7VDittvu60iaq9P2otcWQJFEvEIJXBIgwfKmUHMD/edUGG8+t2PVRAVXHBJfF3cz+iYaxuyDl8WsEX/3lVQhMxflN3WkzLe/S0uU6RGPs22QkDz/WF1mvG8C91ixVXeXSPCIQ1TWPAHXTdsYsA0ZM4zwlUaABKdqX2q0voHohjvu4juNdJhujbYsWTJRT3QhDPyyNkbUhDpBm5ISgN4V37RM7Me1DKJGHlvIO8Ka3Nm9VZSVlmHEnnQDMA4AmVZfaWf3lFqq1BvoyVqbeoyclUJQ7hhYjQIDAQAB",
   "name": "Vimium",
   "version": "2.4.2",
   "description": "The Hacker's Browser. Vimium provides keyboard shortcuts for navigation and control in the spirit of Vim.",
